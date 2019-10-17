@@ -6,17 +6,22 @@
 
 #define SMALL -1000
 
+#define ROW 10
+
+#define COL 10
+
 
 void smith(char* str_a, char* str_b);
 void print_arr(int** arr, int len_a, int len_b);
 int max3(int x, int y, int z);
 int max2(int x, int y);
+void diagonalOrder(int matrix[ROW][COL]) ;
 
 
 int main(){
 
-    char* a = "GCATGCUAKJDKJFHSDKJHFKSDJHFKSDJHFKSJDHFKSJDHFKSJDFHKSDJFHKSJDFHKSDJHFKSJDHFKSDJFHKDSJFH";
-    char* b = "GCATGCUAKJDKJFHSDKJHFKSDJHFKSDJHFKSJDHFKAFSDFSDHKSDJFHKSJDFHKSDJHSDDFKSJDHFKSDJFHKDSJFH";
+    char* a = "GATTACACACC";
+    char* b = "GATTACA";
 
 
     clock_t start, end;
@@ -66,22 +71,36 @@ void smith(char* str_a, char* str_b){
     int gap = -2;
     int s;
     int val;
-    for(int i = 1; i < len_a; i++){
-        for (int j = 1; j < len_b; j++){
-            
-            if(str_b[i-1] == str_a[j-1]){
-                s = match;
-            }else{
-                s = mismatch;
-            }
-            val = max3(scores[i-1][j] + gap, 
-                            scores[i][j-1] + gap, 
-                            scores[i-1][j-1] + s);
-            scores[i][j] = max2(val, 0);
-        }
-    }
+
+
+
     print_arr(scores, len_a, len_b);
 }
+
+void diagonalOrder(int matrix[ROW][COL]) 
+{ 
+    // There will be ROW+COL-1 lines in the output 
+    for (int line=1; line<=(ROW + COL -1); line++) 
+    { 
+        /* Get column index of the first element in this line of output. 
+           The index is 0 for first ROW lines and line - ROW for remaining 
+           lines  */
+        int start_col =  max(0, line-ROW); 
+  
+        /* Get count of elements in this line. The count of elements is 
+           equal to minimum of line number, COL-start_col and ROW */
+         int count = min(line, (COL-start_col), ROW); 
+  
+        /* Print elements of this line */
+        for (int j=0; j<count; j++){
+            int x = 
+            printf("%5d ", matrix[minu(ROW, line)-j-1][start_col+j]);
+        }
+  
+        /* Ptint elements of next diagonal on next line */
+        printf("\n"); 
+    } 
+} 
 
 void print_arr(int** arr, int len_a, int len_b){
 
@@ -101,3 +120,6 @@ int max3(int x, int y, int z){
 int max2(int x, int y){
     return x > y ? x : y;
 }
+
+int minu(int a, int b) 
+{ return (a < b)? a: b; } 
