@@ -195,11 +195,16 @@ void stitch_row(int** block, int* row, int b_height, int b_width){
     }
 }
 
-void stitch_both(int** block, int* row, int b_height, int b_width){
-    //TODO
-    //Stitches both column and row onto the block
-    //in order [Column rev, single, row] (i think this is best?)
-    
+void stitch_both(int** block, int* col_1_row, int b_height, int b_width){
+    int max_len = b_height + b_width + 1 ;
+    //make col_1_row in 
+    for (int i = b_height-1; i >= 0; i--){
+        block[i][0] = col_1_row[i];
+    }
+    block[0][0] = col_1_row[b_height];
+    for(int i = b_height+1; i < max_len){
+        block[0][i] = col_1_row[i]
+    }
 
 }
 
