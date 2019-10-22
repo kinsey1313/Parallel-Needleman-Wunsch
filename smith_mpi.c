@@ -19,8 +19,13 @@
 //     return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
 // }
 
-void print_mat(int** arr, int len_a, int len_b);
+void print_mat(int** arr, int n_rows, int n_cols);
 void print_arr(int* arr, int size);
+void calc_block(int** block, int b_height, int b_width, int off_col, int off_width);
+void stitch_both(int** block, int* col_1_row, int b_height, int b_width);
+void stitch_column(int** block, int* col, int b_height, int b_width);
+void stitch_row(int** block, int* row, int b_height, int b_width);
+
 
 int main(int argc, char *argv[]) {
     int rank, size;
@@ -31,8 +36,8 @@ int main(int argc, char *argv[]) {
     char* b;
     if (rank==0) {
         //Do the file reading cuz
-        a = "GTA";
-        b = "GTA";
+        a = "GTACA";
+        b = "GTACA";
     }
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -72,6 +77,12 @@ void smith(char* a, char* b, int rank, int size) {
             for (int j = 0; j < len_b; j++){
                 scores[i][j] = i+j;
             }
+        }
+        for(int i = 0; i < len_a; i++){
+            scores[i][0] = 0;
+        }
+        for(int i = 0; i < len_b; i++){
+            scores[0][i] = 0;
         }
         print_mat(scores, len_a, len_b);
 
@@ -129,14 +140,42 @@ void smith(char* a, char* b, int rank, int size) {
 
         MPI_Recv(recv_buffer, max_send, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         int tag = status.MPI_TAG;
-        printf("%d \n", tag);
+        //printf("%d \n", tag);
 
         if(tag==T_COL_ONLY){
-            printf("Received column");
-            printf("%d %d %d", recv_buffer[0], recv_buffer[1], recv_buffer[2]);
+            printf("received col s: %d\n", size);
             print_arr(recv_buffer, b_height);
+            
+            print_mat(block, b_height, b_width);
+            stitch_column(block,recv_buffer,b_height,b_width);
+            print_mat(block, b_height, b_width);
+            //send back
+            while(1){
+                TODO calculate each block along top and return result
+                if(!calc_top_col()){
+                    break;
+                }
+            }
         }
+        if(tag==T_ROW_ONLY){
+            printf("received row s: %d\n", size);
+            print_arr(recv_buffer, b_width);
+            print_mat(block, b_height, b_width);
+            stitch_row(block,recv_buffer,b_height,b_width);
+            print_mat(block, b_height, b_width);
+            
 
+            while(1){
+                // if(!calc_left_row()){
+                //     break;
+                // }
+            }
+                
+        }else{
+            //block with two parents
+            stitch_both(block, recv_buffer, b_height, b_width);
+
+        }
         while(1){
             break;
 
@@ -145,15 +184,18 @@ void smith(char* a, char* b, int rank, int size) {
             }
         }
 
-    
+}
 
+void copy_block_master(){
+    //Master only function, copies the received block onto master
+    //Copies block onto master process
 }
 
 void calc_block(int** block, int b_height, int b_width, int off_col, int off_width){
     for (int i = 1; i < b_height; i++){
         for (int j = 1; j < b_width; j++){
             //do algo here using openmp
-            block[i][j] = i + j;
+            //block[i][j] = i + j;
         }
     }
 
@@ -188,7 +230,7 @@ void stitch_row(int** block, int* row, int b_height, int b_width){
     // }
     
     for(int i = 0; i<b_width; i++){
-        block[0][i] = col[i];
+        block[0][i] = row[i];
     }
     for (int i = 0; i < b_height; i++){
         block[i][0] = 0;
@@ -202,23 +244,22 @@ void stitch_both(int** block, int* col_1_row, int b_height, int b_width){
         block[i][0] = col_1_row[i];
     }
     block[0][0] = col_1_row[b_height];
-    for(int i = b_height+1; i < max_len){
-        block[0][i] = col_1_row[i]
+    for(int i = b_height+1; i < max_len; i++){
+        block[0][i] = col_1_row[i];
     }
-
 }
 
 
-void print_mat(int** arr, int len_a, int len_b){
-
-    for(int i = 0; i < len_a; i++){
-        for (int j = 0; j < len_b; j++){
+void print_mat(int** arr, int n_rows, int n_cols){
+    printf("\n");
+    for(int i = 0; i < n_rows; i++){
+        for (int j = 0; j < n_cols; j++){
             //printf("%d\t", arr[i][j]);
-            printf("%d\t", &arr[i][j]);
+            printf("%d\t", arr[i][j]);
         }
         printf("\n");
     }
-
+    
 }
 
 void print_arr(int* arr, int size){
@@ -228,8 +269,6 @@ void print_arr(int* arr, int size){
     }
     printf("\n");
 }
-
-
 
 
 void get_last_row(int** scores, int *out, int b_width,int b_height, int off_row, int off_col){
