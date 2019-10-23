@@ -15,6 +15,14 @@ int main(int argc, char *argv[]) {
     MPI_Init (&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    printf("Size is %d\n", size);
+
+    if(size<5) {
+        printf("Error, the algorithm is only defined for >=5 nodes\n");
+        exit(0);
+    }
+
     char* a;
     char* b;
 
@@ -34,7 +42,7 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(&a, len_a, MPI_CHAR, 0, MPI_COMM_WORLD);
     MPI_Bcast(&b, len_b, MPI_CHAR, 0, MPI_COMM_WORLD);
 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    
 
     //uint64_t start = GetTimeStamp();
     //printf("%d", A);
@@ -64,40 +72,48 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         init_queue(worker_queue, size-1);
 
         //Initialise the sides
-        for(int i=0; i>block->height; i++) {
-            block->left_col[i] = i*-1;
+        for(int i=0; i<block->height+1; i++) {
+            block->matrix[i][0] = i*-1;
         }
 
-        for (int i=0; i>block->width; i++) {
-            block->top_row[i] = i*-1;
+        for (int i=0; i<block->width+1; i++) {
+            block->matrix[0][i] = i*-1;
         }
 
         calc_block(block);
+        printf("Master printing block:\n");
         print_block(block);
 
         // // Now we take the processes out and send them the job
-        int worker_right = dequeue(worker_queue);
-         
-        sending_block_t* job_right = create_send_block(block, GOING_RIGHT);
-        printf("%d, %d, %d, %d, %d\n", job_right->direction, job_right->off_row, job_right->off_col, job_right->height, job_right->width);
-        print_arr(job_right->edge, job_right->height);
-        printf("Master done printing\n");
-        // printf("Am I seg faulting here?\n");
+        int worker_right = get_next_worker(worker_queue);
+        sending_block_t* job_right = create_send_block(block, GOING_RIGHT, MASTER);
         send_job(job_right, worker_right, mpi_send_block_t);
-        // int proc_down = dequeue(worker_queue);
-        free(job_right);
 
-        free(block);
-        free(worker_queue); 
+        int worker_down = get_next_worker(worker_queue);
+        sending_block_t* job_down = create_send_block(block, GOING_DOWN, MASTER);
+        send_job(job_down, worker_down, mpi_send_block_t);
+
+        free_send_block(job_right);
+        free_send_block(job_down);
+        free_block(block);
+        free_queue(worker_queue); 
     }
     /*========SLAVE NODE============*/
     else {
         MPI_Status status;
         sending_block_t* job = malloc_send_block(block_height, block_width);
         MPI_Recv(job, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &status);
-        printf("%d, %d, %d, %d, %d\n", job->direction, job->off_row, job->off_col, job->height, job->width);
-        printf("well we did it fellas\n");
-        print_arr(job->edge, job->height);
+        block_t* block = create_block_from_send(job);
+        printf("Slave printing block:\n");
+        print_block(block);
+
+
+
+
+
+
+        free_send_block(job);
+        free_block(block);
     }
 }
 
@@ -105,52 +121,32 @@ void calc_block(block_t* block) {
     //TODO
     //TODO Make sure it uses the top row or left col if needed. These are not part 
     // Of the block for good reason
-    for(int i=0; i<block->height; i++) {
-        for(int j=0; j<block->width; j++) {
+    for(int i=1; i<=block->height; i++) {
+        for(int j=1; j<=block->width; j++) {
             block->matrix[i][j] = i+j;
         }
     }
 
 }
 
-void stitch_column(int** block, int* col, int b_height, int b_width){
-    //Stitches column onto the first index of our block;
-    //also adds the zeros TODO do this in one loop
-    
-    for (int i = 0; i <b_height; i++){
-        block[i][0] = col[i];
+int get_next_worker(struct Queue* worker_queue) {
+    int worker;
+    MPI_Status status;
+    if(isEmpty(worker_queue)) {
+        //blocking recv to get a ready worker
+        MPI_Recv(&worker, 1, MPI_INT, MPI_ANY_SOURCE, FINISHED_WORK, MPI_COMM_WORLD, &status);
     }
-    for (int i =0; i < b_width; i++){
-        block[0][i]=0;
+    else {
+        worker = dequeue(worker_queue);
     }
-}
-
-void stitch_row(int** block, int* row, int b_height, int b_width){
-    for(int i = 0; i<b_width; i++){
-        block[0][i] = row[i];
-    }
-    for (int i = 0; i < b_height; i++){
-        block[i][0] = 0;
-    }
-}
-
-void stitch_both(int** block, int* col_1_row, int b_height, int b_width){
-    int max_len = b_height + b_width + 1 ;
-    //make col_1_row in 
-    for (int i = b_height-1; i >= 0; i--){
-        block[i][0] = col_1_row[i];
-    }
-    block[0][0] = col_1_row[b_height];
-    for(int i = b_height+1; i < max_len; i++){
-        block[0][i] = col_1_row[i];
-    }
+    return worker;
 }
 
 
 void print_block(block_t* block) {
     printf("\n");
-    for(int i = 0; i < block->height; i++){
-        for (int j = 0; j < block->width; j++){
+    for(int i = 0; i < block->height+1; i++){
+        for (int j = 0; j < block->width+1; j++){
             printf("%d\t", block->matrix[i][j]);
         }
         printf("\n");
@@ -163,20 +159,6 @@ void print_arr(int* arr, int size){
         printf("%d ", arr[i]);
     }
     printf("\n");
-}
-
-
-void get_last_row(int** scores, int *out, int b_width,int b_height, int off_row, int off_col){
-    for (int i = 0; i < b_width; i++){
-        out[i] = scores[off_row + b_height][off_col + i];
-    }
-}
-
-
-void get_last_col(int** scores, int *out, int b_width,int b_height, int off_row, int off_col){
-    for (int i = 0; i < b_height; i++){
-        out[i] = scores[off_row + i][off_col+b_width];
-    }
 }
 
 int calc_block_width(int len_a, int len_b, int size) {
