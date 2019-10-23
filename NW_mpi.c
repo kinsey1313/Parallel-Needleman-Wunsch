@@ -5,26 +5,10 @@
 #include <stdlib.h>
 #include <mpi.h>
 #include "queue.h"
-
+#include "types.h"
+#include "util.h"
+#include "NW_mpi.h"
 #include <time.h>
-
-#define T_ROW_ONLY 1
-#define T_COL_ONLY 2
-
-#define BLOCK_SIZE 10
-
-// uint64_t GetTimeStamp() {
-//     struct timeval tv;
-//     gettimeofday(&tv,NULL);
-//     return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
-// }
-
-void print_mat(int** arr, int n_rows, int n_cols);
-void print_arr(int* arr, int size);
-void calc_block(int** block, int b_height, int b_width, int off_col, int off_width);
-void stitch_both(int** block, int* col_1_row, int b_height, int b_width);
-void stitch_column(int** block, int* col, int b_height, int b_width);
-void stitch_row(int** block, int* row, int b_height, int b_width);
 
 int main(int argc, char *argv[]) {
     int rank, size;
@@ -33,20 +17,28 @@ int main(int argc, char *argv[]) {
 
     char* a;
     char* b;
+
+    int len_a;
+    int len_b;
     if (rank==0) {
         //Do the file reading cuz
-        a = "GTACA";
-        b = "GTACA";
+        a = "AGTCGGTA"; //size 8 for now
+        b = "AGTTCATG"; //size 8 for now
+        len_a = (int) strlen(a);
+        len_b = (int) strlen(b);
     }
 
-    MPI_Bcast(&a, strlen(a), MPI_CHAR, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&b, strlen(b), MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&len_a, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&len_b, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&a, len_a, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&b, len_b, MPI_CHAR, 0, MPI_COMM_WORLD);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     //uint64_t start = GetTimeStamp();
     //printf("%d", A);
-    nwmpi(a, b, rank, size);
+    nwmpi(a, b, len_a, len_b, rank, size);
 
     //printf("Time: %ld us\n", (uint64_t) (GetTimeStamp() - start));
 
@@ -55,37 +47,67 @@ int main(int argc, char *argv[]) {
 
 }
 
-void nwmpi(char* a, char* b, int rank, int size) {
-    /* ========== MASTER =========== */
-    if(rank==0) {
-        int** scores = (int**)malloc(sizeof(int*)*len_a);
+void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
+    
+    int n_blocks = calc_n_blocks(len_a, len_b, size);
+    int block_height = calc_block_height(len_a, len_b, size);
+    int block_width = calc_block_width(len_a, len_b, size);
 
-        for(int i = 0; i < len_a; i++) {
-            scores[i] = (int*)calloc(len_b, sizeof(int));
+    MPI_Datatype mpi_send_block_t = register_send_block(block_height, block_width);
+
+    /* ========== MASTER NODE =========== */
+    if(rank==0) {
+        // All the blocks master will hold
+        block_t* block = create_block(block_height, block_width, 0, 0);
+        // Create and initialise queue of workers
+        struct Queue* worker_queue = createQueue(size-1);
+        init_queue(worker_queue, size-1);
+
+        //Initialise the sides
+        for(int i=0; i>block->height; i++) {
+            block->left_col[i] = i*-1;
         }
 
-        //TODO Initialise NW values to correct ones
+        for (int i=0; i>block->width; i++) {
+            block->top_row[i] = i*-1;
+        }
+
+        calc_block(block);
+        print_block(block);
+
+        // // Now we take the processes out and send them the job
+        int worker_right = dequeue(worker_queue);
+         
+        sending_block_t* job_right = create_send_block(block, GOING_RIGHT);
+        printf("%d, %d, %d, %d, %d\n", job_right->direction, job_right->off_row, job_right->off_col, job_right->height, job_right->width);
+        print_arr(job_right->edge, job_right->height);
+        printf("Master done printing\n");
+        // printf("Am I seg faulting here?\n");
+        send_job(job_right, worker_right, mpi_send_block_t);
+        // int proc_down = dequeue(worker_queue);
+        free(job_right);
+
+        free(block);
+        free(worker_queue); 
+    }
+    /*========SLAVE NODE============*/
+    else {
+        MPI_Status status;
+        sending_block_t* job = malloc_send_block(block_height, block_width);
+        MPI_Recv(job, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &status);
+        printf("%d, %d, %d, %d, %d\n", job->direction, job->off_row, job->off_col, job->height, job->width);
+        printf("well we did it fellas\n");
+        print_arr(job->edge, job->height);
     }
 }
 
-
-
-
-
-
-
-
-
-void copy_block_master(){
-    //Master only function, copies the received block onto master
-    //Copies block onto master process
-}
-
-void calc_block(int** block, int b_height, int b_width, int off_col, int off_width){
-    for (int i = 1; i < b_height; i++){
-        for (int j = 1; j < b_width; j++){
-            //do algo here using openmp
-            //block[i][j] = i + j;
+void calc_block(block_t* block) {
+    //TODO
+    //TODO Make sure it uses the top row or left col if needed. These are not part 
+    // Of the block for good reason
+    for(int i=0; i<block->height; i++) {
+        for(int j=0; j<block->width; j++) {
+            block->matrix[i][j] = i+j;
         }
     }
 
@@ -104,21 +126,6 @@ void stitch_column(int** block, int* col, int b_height, int b_width){
 }
 
 void stitch_row(int** block, int* row, int b_height, int b_width){
-    //Stitches the row onto the block
-    //TODO do in one loop as above i.e. max of
-    //IDK which one is quicker
-    // int i = 0
-    // int max_len = max2(b_height, b_width);
-    // while(i < max_len){
-    //     if(i < b_height){
-    //         block[0][i] = col[i];
-    //     }
-    //     if(i < max_width){
-    //         block[i][0] = 0;
-    //     }
-    //     i++;
-    // }
-    
     for(int i = 0; i<b_width; i++){
         block[0][i] = row[i];
     }
@@ -140,16 +147,14 @@ void stitch_both(int** block, int* col_1_row, int b_height, int b_width){
 }
 
 
-void print_mat(int** arr, int n_rows, int n_cols){
+void print_block(block_t* block) {
     printf("\n");
-    for(int i = 0; i < n_rows; i++){
-        for (int j = 0; j < n_cols; j++){
-            //printf("%d\t", arr[i][j]);
-            printf("%d\t", arr[i][j]);
+    for(int i = 0; i < block->height; i++){
+        for (int j = 0; j < block->width; j++){
+            printf("%d\t", block->matrix[i][j]);
         }
         printf("\n");
     }
-    
 }
 
 void print_arr(int* arr, int size){
@@ -162,7 +167,6 @@ void print_arr(int* arr, int size){
 
 
 void get_last_row(int** scores, int *out, int b_width,int b_height, int off_row, int off_col){
-    
     for (int i = 0; i < b_width; i++){
         out[i] = scores[off_row + b_height][off_col + i];
     }
@@ -175,39 +179,15 @@ void get_last_col(int** scores, int *out, int b_width,int b_height, int off_row,
     }
 }
 
-
-
-void request_row(){
-    //get the required row from master
-
-
+int calc_block_width(int len_a, int len_b, int size) {
+    return len_a / 4;
 }
 
-void request_column(){
-    //get the required column from master
-
+int calc_block_height(int len_a, int len_b, int size) {
+    return len_b / 4;
 }
 
-
-void send_result(){
-    //Sends the result from worker to master
-
-}
-
-void receive_result(){
-    //receive the result in master and stitches together
-
-}
-
-
-void get_adjacent_process(){
-    //master sends process which is either always right or always below the
-    //current process
-}
-
-int max2(int a, int b){
-    if(a>b){
-        return a;
-    }
-    return b;
+// There are n * n blocks, this is actually sqrt(total blocks)
+int calc_n_blocks(int len_a, int len_b, int size) {
+    return 4;
 }

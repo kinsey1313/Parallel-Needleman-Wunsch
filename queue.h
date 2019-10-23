@@ -19,6 +19,7 @@ void enqueue(struct Queue* queue, int item);
 int dequeue(struct Queue* queue);
 int front(struct Queue* queue);
 int rear(struct Queue* queue);
+void init_queue(struct Queue* queue, int size);
 
 
 

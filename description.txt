@@ -1,0 +1,23 @@
+Master:
+
+Do first block (0,0)
+Take process out of queue and give it the column (P1)
+Take process out of the queue and give it the row (P2)
+Do second block (1,1)
+Wait for results from P1 and P2
+Take process out of queue and give it the column (P3)
+Tell (P1) about (P3), from now on it nonblocking sends to P3 
+Take process out of queue and give it row (P4)
+Tell (P2) about (P4), from now on it nonblocking sends to P4
+
+and so on
+
+
+Slave:
+
+Wait for something to do
+Do it
+Tell master it's done 
+Do next block and wait for master to tell you who to send to
+Now you can non-blocking send to that guy
+Keep going until done, then tell master you're done and ready for more work

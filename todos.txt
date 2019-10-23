@@ -1,0 +1,3 @@
+//TODOs
+
+1. Write functions to free the structs properly
