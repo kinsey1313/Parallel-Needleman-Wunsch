@@ -20,3 +20,4 @@ void copy_first_column(block_t* block, int* buf);
 void copy_final_row(int* buf, block_t* block);
 void copy_first_row(block_t* block, int* buf); 
 int max2(int a, int b);
+int max3(int a, int b, int c);
