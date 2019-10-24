@@ -1,3 +1,5 @@
 //TODOs
 
-1. Write functions to free the structs properly
+1. Add serial implementation of needleman so that calc_block actually performs as expected
+3. Write function that will update a slave's send block with their completed block's details (instead of mallocing another one)  
+2. Allow slaves to continue working after they finish the first block (if they can)

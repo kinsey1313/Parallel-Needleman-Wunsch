@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    printf("Size is %d\n", size);
+    
 
     if(size<5) {
         printf("Error, the algorithm is only defined for >=5 nodes\n");
@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
     int len_a;
     int len_b;
     if (rank==0) {
+        printf("Size is %d\n", size);
         //Do the file reading cuz
         a = "AGTCGGTA"; //size 8 for now
         b = "AGTTCATG"; //size 8 for now
@@ -65,8 +66,9 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
 
     /* ========== MASTER NODE =========== */
     if(rank==0) {
-        // All the blocks master will hold
+        // First block for master
         block_t* block = create_block(block_height, block_width, 0, 0);
+        block_t* start_block = block; //Keep a pointer to the first one
         // Create and initialise queue of workers
         struct Queue* worker_queue = createQueue(size-1);
         init_queue(worker_queue, size-1);
@@ -93,6 +95,19 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         sending_block_t* job_down = create_send_block(block, GOING_DOWN, MASTER);
         send_job(job_down, worker_down, mpi_send_block_t);
 
+        //Now receive the results of those two
+        MPI_Status status;
+        MPI_Recv(job_right, 1, mpi_send_block_t, worker_right, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(job_down, 1, mpi_send_block_t, worker_down, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        
+        //And use the results to do the next block.
+        block_t* next_block = master_next_block(job_right, job_down);
+        block->next = next_block;
+        block = next_block; // Shift the pointers along
+        printf("Master printing block:\n");
+        print_block(next_block);
+
+
         free_send_block(job_right);
         free_send_block(job_down);
         free_block(block);
@@ -101,18 +116,27 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     /*========SLAVE NODE============*/
     else {
         MPI_Status status;
-        sending_block_t* job = malloc_send_block(block_height, block_width);
-        MPI_Recv(job, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &status);
-        block_t* block = create_block_from_send(job);
+        MPI_Request request;
+        sending_block_t* send_block = malloc_send_block(block_height, block_width);
+        MPI_Recv(send_block, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &status);
+        int direction = send_block->direction; //The way the slave will continue on
+        int slave_sender = send_block->slave_sender; //Where to receive the other values from
+        block_t* block = create_block_from_send(send_block);
+        calc_block(block);
         printf("Slave printing block:\n");
         print_block(block);
+        int other_direction = get_other_direction(direction);
+        update_send_block(block, send_block, other_direction, slave_sender);
+        MPI_Isend(send_block, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &request);
+
+         
 
 
 
 
 
 
-        free_send_block(job);
+        free_send_block(send_block);
         free_block(block);
     }
 }

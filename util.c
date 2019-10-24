@@ -55,10 +55,14 @@ block_t* create_block(int height, int width, int off_row, int off_col) {
 }
 
 sending_block_t* create_send_block(block_t* block, int direction, int slave_sender) {
-    int height = block->height;
-    int width = block->width;
-    int edge_len = max2(height, width) + 1;
+    int edge_len = max2(block->height, block->width) + 1;
     sending_block_t *send_block = malloc(sizeof(*send_block) + sizeof(int) * edge_len);
+    update_send_block(block, send_block, direction, slave_sender);
+    return send_block;
+}
+
+//Updates existing send block with details 
+void update_send_block(block_t* block, sending_block_t* send_block, int direction, int slave_sender) {
     if (direction==GOING_RIGHT) {
         copy_final_column(send_block->edge, block);
     } 
@@ -69,9 +73,8 @@ sending_block_t* create_send_block(block_t* block, int direction, int slave_send
     send_block->slave_sender = slave_sender;
     send_block->off_col = block->off_col;
     send_block->off_row = block->off_row;
-    send_block->height = height;
-    send_block->width = width;
-    return send_block;
+    send_block->height = block->height;
+    send_block->width = block->width;
 }
 
 //Create a block to work on based on the send_block that was received
@@ -98,6 +101,7 @@ block_t* create_block_from_send(sending_block_t* send_block) {
             //TODO
             //Need to receive the top row from our slave sender
             MPI_Status status;
+            printf("In here\n");
             MPI_Recv(block->matrix[0], width+1, MPI_INT, slave_sender, MPI_ANY_TAG,
                                  MPI_COMM_WORLD, &status); //idk if this will work
         }
@@ -117,6 +121,7 @@ block_t* create_block_from_send(sending_block_t* send_block) {
             //TODO
             //Need to receive the top col from our slave sender
             MPI_Status status;
+            printf("In here\n");
             int* buf = malloc(sizeof(int) * height+1);
             MPI_Recv(buf, height+1, MPI_INT, slave_sender, MPI_ANY_TAG,
                                 MPI_COMM_WORLD, &status);
@@ -136,6 +141,15 @@ sending_block_t* malloc_send_block(int height, int width) {
     return send_block;
 }
 
+//Creates a new block for master to solve based on the received jobs
+block_t* master_next_block(sending_block_t* left, sending_block_t* up) {
+    block_t* block = create_block(left->height, up->width, left->off_col, up->off_row);
+    //Now fill the edge values from the sent blocks
+    copy_first_column(block, left->edge);
+    copy_first_row(block, up->edge);
+    return block;
+}
+
 void free_block(block_t* block) {
     for(int i=0; i<block->height+1; i++) {
         free(block->matrix[i]);
@@ -152,6 +166,18 @@ void free_send_block(sending_block_t* block) {
 }
 
 /*=========MISC HELPERS=========*/
+
+int get_other_direction(int direction) {
+    if(direction==GOING_DOWN) {
+        return GOING_RIGHT;
+    }
+    if(direction==GOING_RIGHT) {
+        return GOING_DOWN;
+    }
+    printf("Invalid direction %d\n", direction);
+    return direction;
+}
+
 void copy_final_column(int* buf, block_t* block) {
     int width = block->width+1;
     int height = block->height+1;
@@ -170,7 +196,6 @@ void copy_first_column(block_t* block, int* buf) {
 void copy_final_row(int* buf, block_t* block) {
     int width = block->width+1;
     int height = block->height+1;
-    // memcpy(buf, block->matrix[height-1], width);
     for(int i=0; i<width; i++) {
         buf[i] = block->matrix[height-1][i];
     }
