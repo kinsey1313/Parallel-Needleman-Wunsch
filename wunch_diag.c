@@ -8,12 +8,12 @@
 
 #define MAX_STRING 1000
 
-void smith_score(int** scores, char* str_a, char* str_b, int i, int j);
+void wunch_score(int** scores, char* str_a, char* str_b, int i, int j);
 void print_arr(int** arr, int len_a, int len_b);
 int max2(int x, int y);
 int max3(int x, int y, int z);
 char *get_input_str(char* filename, size_t size);
-void smith(int** scores, char* str_a, char* str_b, int len_a, int len_b);
+void wunch(int** scores, char* str_a, char* str_b, int len_a, int len_b);
 void back_track(int** scores, char* str_a, char* str_b, int len_a, int len_b);
 void check_path(int** scores, int i, int j, char* str_a, char* str_b);
 
@@ -54,7 +54,7 @@ int main(){
     
     
     uint64_t start = GetTimeStamp ();
-    smith(scores,str_a,str_b,len_a,len_b);
+    wunch(scores,str_a,str_b,len_a,len_b);
     print_arr(scores,len_a,len_b);
 
     back_track(scores,str_a,str_b,len_a,len_b);
@@ -81,7 +81,7 @@ int main(){
     // return 0;
 }
 
-void smith(int** scores, char* str_a, char* str_b, int len_a, int len_b){
+void wunch(int** scores, char* str_a, char* str_b, int len_a, int len_b){
     len_a-=1;
     len_b-=1;
 
@@ -101,13 +101,13 @@ void smith(int** scores, char* str_a, char* str_b, int len_a, int len_b){
         for (int j = 0; j <=k; j++){
             int i = k - j;
             printf("%d %d |", len_b - j, len_a - i);
-            smith_score(scores,str_a, str_b, len_a - i, len_b-j);
+            wunch_score(scores,str_a, str_b, len_a - i, len_b-j);
         }
         printf("\n");
     }
 }
 
-void smith_score(int** scores, char* str_a, char* str_b, int i, int j){
+void wunch_score(int** scores, char* str_a, char* str_b, int i, int j){
     int match = 1;
     int mismatch = -1;
     int gap = -1;
@@ -211,7 +211,4 @@ char *get_input_str(char* filename, size_t size){
 
     return realloc(str, sizeof(char)*len);
 }
-
-
-
 
