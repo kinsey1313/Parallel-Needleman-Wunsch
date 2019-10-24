@@ -15,19 +15,22 @@ int max2(int x, int y);
 
 int main(){
 
-    char* a = "GCATGCU";
-    char* b = "GATTACA";
+    char* b = "TGTTACGG";
+    char* a = "GGTTGACTA";
 
 
     clock_t start, end;
 
     printf("%s\n", a);
+    
 
     start = clock();
     smith(a, b);
 
     end = clock();
-    long cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    printf("%f \n", cpu_time_used);
 
     return 0;
 }
