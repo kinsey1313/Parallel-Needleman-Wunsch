@@ -21,3 +21,4 @@ typedef struct sendingblock
     int width;
     int edge[]; //Could either be col or row, including the corner
 } sending_block_t;
+

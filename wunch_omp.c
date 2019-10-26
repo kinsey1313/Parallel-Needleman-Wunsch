@@ -24,7 +24,7 @@ uint64_t GetTimeStamp() {
     return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
 }
 
-int main(){
+int main(int argc, char* argv[]){
     //int arr[3][4] = {{1,2,3,4}, {4,5,6,4}, {7,8,9,4}};
     int dim = 4;
     

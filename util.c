@@ -6,8 +6,7 @@
 #include "types.h"
 #include "NW_mpi.h"
 #include "util.h"
-
-
+#include <sys/time.h>
 
 // Registers an MPI struct for block sending
 MPI_Datatype register_send_block(int block_height, int block_width) {

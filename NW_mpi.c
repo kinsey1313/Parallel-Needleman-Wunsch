@@ -9,7 +9,17 @@
 #include "types.h"
 #include "util.h"
 #include "NW_mpi.h"
-#include <time.h>
+//#include <time.h>
+#include <stdint.h>
+#include <sys/time.h>
+
+
+uint64_t GetTimeStamp() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
+}
+
 
 int main(int argc, char *argv[]) {
     int rank, size;
@@ -61,15 +71,17 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(b, len_b+1, MPI_CHAR, 0, MPI_COMM_WORLD);
 
     
-
-    //uint64_t start = GetTimeStamp();
+    uint64_t start = GetTimeStamp();
+    
     //printf("%d", A);
     nwmpi(a, b, len_a, len_b, rank, size);
 
-    //printf("Time: %ld us\n", (uint64_t) (GetTimeStamp() - start));
-
+    
     MPI_Finalize();
-    // sleep(300);
+    if(rank==MASTER){
+        printf("Time: %ld us\n", (uint64_t) (GetTimeStamp() - start));
+    }
+
     return 0;
 
 }
@@ -79,14 +91,14 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     int n_blocks_master = calc_n_blocks(len_a, len_b, size);
     int block_height = calc_block_height(len_a, len_b, size);
     int block_width = calc_block_width(len_a, len_b, size);
-    printf("We begin with %d by %d blocks of height %d and width %d\n", n_blocks_master, n_blocks_master, block_height, block_width);
+    //printf("We begin with %d by %d blocks of height %d and width %d\n", n_blocks_master, n_blocks_master, block_height, block_width);
 
     MPI_Status status;
     MPI_Request request;
     MPI_Datatype mpi_send_block_t = register_send_block(block_height, block_width);
-    printf("Rank is %d\n", rank);
+    //printf("Rank is %d\n", rank);
 
-    printf("a is len %d, b is len %d\n", len_a, len_b);
+    //printf("a is len %d, b is len %d\n", len_a, len_b);
 
     /* ========== MASTER NODE =========== */
     if(rank==0) {
@@ -132,11 +144,11 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             }
 
             calc_block(block, a, b);
-            printf("Master printing block %d with row off %d and col off %d\n", block_num, block->off_row, block->off_col);
-            print_block(block);
+            //printf("Master printing block %d with row off %d and col off %d\n", block_num, block->off_row, block->off_col);
+            //print_block(block);
 
             if(block_num==n_blocks_master-1) { //If the last block, we don't need to send it to anyone
-                printf("Master is all done\n");
+                //printf("Master is all done\n");
                 break;
             }
 
@@ -190,14 +202,14 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             int direction = send_block->direction; //The way the slave will continue on
             int slave_sender = send_block->slave_sender; //Where to receive the other values from
             block_t* block = create_block_from_send(send_block, other_work, mpi_send_block_t);
-            printf("Slave %d is beginning work on block with row_off %d and col_off %d\n", rank, block->off_row, block->off_col);
+            //printf("Slave %d is beginning work on block with row_off %d and col_off %d\n", rank, block->off_row, block->off_col);
 
             // Maintain the linked list
             if(start_block==NULL) {
                 start_block = block;
             }
 
-            printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
+            //printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
             calc_block(block, a, b);
             print_block(block); 
             
@@ -219,7 +231,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 block = next_block;
 
                 //Calculate block
-                printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
+                //printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
                 calc_block(block, a, b);
                 print_block(block); 
 
@@ -234,21 +246,21 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 // send_block = malloc_send_block(block->height, block->width);
                 update_send_block(block, send_block, other_direction, slave_sender); // Can't do this because if you get too far ahead you're overwriting the buffer
                 // MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, 0, MPI_COMM_WORLD, &request);
-                printf("Slave %d sending work to slave %d for row_off %d and col_off %d\n", rank, slave_receiver, block->off_row, block->off_col);
+                //printf("Slave %d sending work to slave %d for row_off %d and col_off %d\n", rank, slave_receiver, block->off_row, block->off_col);
                 MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, INTER_SLAVE, MPI_COMM_WORLD, &request);
                 next_block = slave_next_block(block, other_work, direction, slave_sender, len_a, len_b, mpi_send_block_t); 
             }
 
-        printf("Slave %d is finished and ready for more\n", rank);
+        //printf("Slave %d is finished and ready for more\n", rank);
         MPI_Send(&rank, 1, MPI_INT, MASTER, FINISHED_WORK, MPI_COMM_WORLD);
         }
 
-        printf("Slave %d killed\n", rank);
-        sleep(1);
+        //printf("Slave %d killed\n", rank);
+        //sleep(1);
         free_send_block(send_block);
         free_block(start_block);
         free_send_block(other_work);
-        sleep(2);
+        //sleep(2);
     }
 
     MPI_Type_free(&mpi_send_block_t);
@@ -279,7 +291,7 @@ void wunch_omp(int** scores, char* str_a, char* str_b, int len_a, int len_b){
             //printf("%d %d |", i+1, j+1);
             wunch_score(scores, str_a, str_b, i+1, j+1);
         }
-        printf("\n");
+        //printf("\n");
     }
     
 
@@ -290,7 +302,7 @@ void wunch_omp(int** scores, char* str_a, char* str_b, int len_a, int len_b){
             //printf("%d %d |", len_b - j, len_a - i);
             wunch_score(scores,str_a, str_b, len_a - i, len_b-j);
         }
-        printf("\n");
+        //printf("\n");
     }
 }
 
