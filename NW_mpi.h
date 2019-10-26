@@ -2,6 +2,9 @@
 #define GOING_RIGHT 1
 #define GOING_DOWN 2
 #define FINISHED_WORK 3
+#define SLAVE_RECEIVER 4
+#define DIE_SLAVE 5
+#define INTER_SLAVE 6
 
 /* RANKS */
 #define MASTER 0

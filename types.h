@@ -14,7 +14,7 @@ typedef struct block
 typedef struct sendingblock
 {
     int direction;
-    int slave_sender;
+    int slave_sender; // Assume this is who will send you the other values
     int off_row;
     int off_col;
     int height;

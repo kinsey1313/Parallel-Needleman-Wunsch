@@ -11,7 +11,7 @@
 
 // Registers an MPI struct for block sending
 MPI_Datatype register_send_block(int block_height, int block_width) {
-    int edge_len = max2(block_height, block_width)+1;
+    int edge_len = max2(block_height, block_width)+2;
     int count = SENDING_BLOCK_COUNT;
     int array_of_blocklengths[count];
     MPI_Aint array_of_displacements[count];
@@ -47,9 +47,9 @@ block_t* create_block(int height, int width, int off_row, int off_col) {
     block->off_row = off_row;
     block->off_col = off_col;
     block->next = NULL;
-    block->matrix = malloc(sizeof(int*) * height+1);
+    block->matrix = malloc(sizeof(int*) * (height+1));
     for(int i=0; i<height+1; i++) {
-        block->matrix[i] = calloc(width+1, sizeof(int));
+        block->matrix[i] = malloc((width+1) * sizeof(int));
     }
     return block;
 }
@@ -78,7 +78,7 @@ void update_send_block(block_t* block, sending_block_t* send_block, int directio
 }
 
 //Create a block to work on based on the send_block that was received
-block_t* create_block_from_send(sending_block_t* send_block) {
+block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* other_work, MPI_Datatype mpi_send_block_t) {
     int height = send_block->height;
     int width = send_block->width;
     int off_row = send_block->off_row;
@@ -98,12 +98,10 @@ block_t* create_block_from_send(sending_block_t* send_block) {
             }
         }
         else {
-            //TODO
-            //Need to receive the top row from our slave sender
             MPI_Status status;
-            printf("In here\n");
-            MPI_Recv(block->matrix[0], width+1, MPI_INT, slave_sender, MPI_ANY_TAG,
-                                 MPI_COMM_WORLD, &status); //idk if this will work
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
+                                 MPI_COMM_WORLD, &status);
+            copy_first_row(block, other_work->edge);
         }
     }
     if(direction==GOING_DOWN) {
@@ -118,15 +116,10 @@ block_t* create_block_from_send(sending_block_t* send_block) {
             }
         }
         else {
-            //TODO
-            //Need to receive the top col from our slave sender
             MPI_Status status;
-            printf("In here\n");
-            int* buf = malloc(sizeof(int) * height+1);
-            MPI_Recv(buf, height+1, MPI_INT, slave_sender, MPI_ANY_TAG,
-                                MPI_COMM_WORLD, &status);
-            copy_first_column(block, buf);
-            free(buf);
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
+                                 MPI_COMM_WORLD, &status);
+            copy_first_column(block, other_work->edge);
         }
     }
 
@@ -142,15 +135,89 @@ sending_block_t* malloc_send_block(int height, int width) {
 }
 
 //Creates a new block for master to solve based on the received jobs
-block_t* master_next_block(sending_block_t* left, sending_block_t* up) {
-    block_t* block = create_block(left->height, up->width, left->off_col, up->off_row);
+block_t* master_next_block(sending_block_t* left, sending_block_t* up, int len_a, int len_b) {
+    int height = left->height;
+    int width = up->width;
+    int off_col = left->off_col + height;
+    int off_row = up->off_row + width;
+    height = min2(height, (len_b - off_col));
+    width = min2(width, (len_a - off_row));
+    block_t* block = create_block(height, width, off_row, off_col);
     //Now fill the edge values from the sent blocks
     copy_first_column(block, left->edge);
     copy_first_row(block, up->edge);
     return block;
 }
 
+block_t* slave_next_block(block_t* block, sending_block_t* other_work, int direction, int slave_sender, int len_a, int len_b, MPI_Datatype mpi_send_block_t) {
+    //copy appropriate values into our block, then receive from our slave sender
+    int off_row = block->off_row;
+    int off_col = block->off_col;
+    int height = block->height;
+    int width = block->width;
+    MPI_Status status;
+    //Move offsets along
+    if(direction==GOING_DOWN) {
+        off_col += height;
+        // printf("off_col %d and len_b %d\n", off_col, len_b);
+        if(off_col>=len_b) { //We are done
+            return NULL;
+        }
+        height = min2(height, (len_b - off_col));
+    }
+    if(direction==GOING_RIGHT) {
+        off_row += width;
+        // printf("off_row %d and len_a %d\n", off_row, len_a);
+        if(off_row>=len_a) { //We are done
+            return NULL;
+        }
+        width = min2(width, (len_a - off_row));
+    }
+
+    block_t* new_block = create_block(height, width, off_row, off_col);
+
+    // Now we need to get the values we need
+    if(direction==GOING_DOWN) {
+        //Copy last row from previous into first row of this one
+        copy_row_block(block, new_block);
+        if(slave_sender==MASTER) {
+            // We're on the edge, so initialise column 
+            for(int i=0; i<height+1; i++) {
+                new_block->matrix[i][0] = -1 * new_block->off_col - i;
+            }
+        }
+        else {
+            //Copy last column from other guy into our first one
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
+                                 MPI_COMM_WORLD, &status);
+            copy_first_column(new_block, other_work->edge);
+            printf("Received work from slave sender %d\n", slave_sender);
+        }
+
+    }
+    if(direction==GOING_RIGHT) {
+        copy_col_block(block, new_block);
+        if(slave_sender==MASTER) {
+            // We're on the edge, so intialise row
+            for(int i=0; i<width+1; i++) {
+                new_block->matrix[0][i] = -1 * new_block->off_row - i;
+            }
+        }
+        else {
+            // Need to receive the row from slave_sender
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
+                                 MPI_COMM_WORLD, &status);
+            copy_first_row(new_block, other_work->edge);
+        }
+    }
+    return new_block;
+
+}
+
 void free_block(block_t* block) {
+    if(block==NULL) {
+        return;
+    }
     for(int i=0; i<block->height+1; i++) {
         free(block->matrix[i]);
     }
@@ -208,6 +275,24 @@ void copy_first_row(block_t* block, int* buf) {
     }
 }
 
+void copy_row_block(block_t* src, block_t* dest) {
+    //Copy final row from source to first row in dest
+    int width = src->width;
+    int height = src->height;
+    for(int i=0; i<width+1; i++) {
+        dest->matrix[0][i] = src->matrix[height][i];
+    }
+}
+
+void copy_col_block(block_t* src, block_t* dest) {
+    //Copy final col from source to first col in dest
+    int width = src->width;
+    int height = src->height;
+    for(int i=0; i<height+1; i++) {
+        dest->matrix[i][0] = src->matrix[i][width];
+    }
+}
+
 int max2(int a, int b){
     if(a>b){
         return a;
@@ -215,6 +300,12 @@ int max2(int a, int b){
     return b;
 }
 
+int min2(int a, int b) {
+    if(a<b) {
+        return a;
+    }
+    return b;
 int max3(int x, int y, int z){
     return x > y ? (x > z ? x : z) : (y > z ? y : z);
+
 }
