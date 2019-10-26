@@ -250,7 +250,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 update_send_block(block, send_block, other_direction, slave_sender); // Can't do this because if you get too far ahead you're overwriting the buffer
                 // MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, 0, MPI_COMM_WORLD, &request);
                 printf("Slave %d sending work to slave %d for row_off %d and col_off %d\n", rank, slave_receiver, block->off_row, block->off_col);
-                MPI_Send(send_block, 1, mpi_send_block_t, slave_receiver, INTER_SLAVE, MPI_COMM_WORLD);
+                MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, INTER_SLAVE, MPI_COMM_WORLD, &request);
                 next_block = slave_next_block(block, other_work, direction, slave_sender, len_a, len_b, mpi_send_block_t); 
             }
 
