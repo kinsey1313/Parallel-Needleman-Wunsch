@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
     if (rank==0) {
         printf("Size is %d\n", size);
         //Do the file reading cuz
-        a = "ATATCA"; //size 8 for now
-        b = "ATATAA"; //size 8 for now
+        a = "ATATCAKSJDFKLJAS;DFDJOIENEFAKSNDFKASNDIFOANRILAKSNDFKNAGOIANRGILANFNSRFOIENRFDKFNSDKJFGEOIRNGSDKFNGDSG"; //size 8 for now
+        b = "ATATAASDFINGSDFKNGSDFGJISEORNGSDLKFNGSERIONGSDKFLGSDIRGJISEORJGSDKRGJS;IDFJGSKDLFJG;SIDRJGSLDKFJGSIDRJ"; //size 8 for now
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
     }
@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
 
     printf("Peace we out \n");
     MPI_Finalize();
+    sleep(1);
     return 0;
 
 }
@@ -159,7 +160,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         /* Waiting for work */
 
         while(1) {
-            // sleep(2);
+            sleep(1);
             MPI_Probe(MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             if(status.MPI_TAG == DIE_SLAVE) { //Goodbye, slave
                 break;
@@ -190,8 +191,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             int in_first = 1;
             int slave_receiver;
             while(next_block!=NULL) {
-                printf("Slave %d In here somewhere\n", rank);
-                // sleep(2);
+                sleep(1);
 
                 //Maintain linked list
                 block->next = next_block;
@@ -220,8 +220,10 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         }
 
         printf("Slave %d killed\n", rank);
+        sleep(1);
         free_send_block(send_block);
         free_block(start_block);
+        sleep(2);
     }
 
 }
@@ -250,13 +252,13 @@ int get_next_worker(struct Queue* worker_queue) {
 
 
 void print_block(block_t* block) {
-    printf("\n");
-    for(int i = 0; i < block->height+1; i++){
-        for (int j = 0; j < block->width+1; j++){
-            printf("%d\t", block->matrix[i][j]);
-        }
-        printf("\n");
-    }
+    // printf("\n");
+    // for(int i = 0; i < block->height+1; i++){
+    //     for (int j = 0; j < block->width+1; j++){
+    //         printf("%d\t", block->matrix[i][j]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 void print_arr(int* arr, int size){

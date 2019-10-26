@@ -156,10 +156,12 @@ block_t* slave_next_block(block_t* block, int direction, int slave_sender, int l
     int height = block->height;
     int width = block->width;
     //Move offsets along
+    printf("Slave about to make new block height %d width %d off_row %d off_col %d, going %d\n", height, width, off_row, off_col, direction);
     if(direction==GOING_DOWN) {
         off_col += height;
         // printf("off_col %d and len_b %d\n", off_col, len_b);
-        if(off_col==len_b) { //We are done
+        if(off_col>=len_b) { //We are done
+            printf("In here right\n");
             return NULL;
         }
         height = min2(height, (len_b - off_col));
@@ -167,12 +169,14 @@ block_t* slave_next_block(block_t* block, int direction, int slave_sender, int l
     if(direction==GOING_RIGHT) {
         off_row += width;
         // printf("off_row %d and len_a %d\n", off_row, len_a);
-        if(off_row==len_a) { //We are done
+        if(off_row>=len_a) { //We are done
+            printf("In here right\n");
             return NULL;
         }
         width = min2(width, (len_a - off_row));
     }
 
+    printf("Slave making block of size %d + %d\n", height, width);
     block_t* new_block = create_block(height, width, off_row, off_col);
 
     // Now we need to get the values we need
