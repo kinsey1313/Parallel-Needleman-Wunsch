@@ -9,7 +9,7 @@ void update_send_block(block_t* block, sending_block_t* send_block, int directio
 block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* other_work, MPI_Datatype mpi_send_block_t);
 sending_block_t* malloc_send_block(int height, int width);
 block_t* master_next_block(sending_block_t* left, sending_block_t* up, int len_a, int len_b);
-block_t* slave_next_block(block_t* block, int direction, int slave_sender, int len_a, int len_b);
+block_t* slave_next_block(block_t* block, sending_block_t* other_work, int direction, int slave_sender, int len_a, int len_b, MPI_Datatype mpi_send_block_t);
 void free_block(block_t* block);
 void free_send_block(sending_block_t* block);
 void send_job(sending_block_t* send_block, int destination, MPI_Datatype mpi_send_block_t);

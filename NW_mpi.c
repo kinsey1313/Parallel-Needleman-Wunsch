@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
     if (rank==0) {
         printf("Size is %d\n", size);
         //Do the file reading cuz
-        a = "ATATATAASDFSDAFSDFGSDFGSDFGT"; //size 8 for now
-        b = "ATATAAASDFASSDFGSDFGSDGSDFSD"; //size 8 for now
+        a = "ATATATAASDFSDAFSSDFASDFASDFAASDFASDFASDFASDFASDFASDFADSFSDFASDFasdfaadff"; //size 8 for now
+        b = "ATATAAASDFGSASDFASDFASDFASDFASDASDFASDFASDFASDFASDFASDFASDFAASDFASDFFASD"; //size 8 for now
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
     }
@@ -49,6 +49,9 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(a, len_a+1, MPI_CHAR, 0, MPI_COMM_WORLD);
     MPI_Bcast(b, len_b+1, MPI_CHAR, 0, MPI_COMM_WORLD);
 
+    len_a = 5000;
+    len_b = 5000;
+
     
 
     //uint64_t start = GetTimeStamp();
@@ -57,9 +60,8 @@ int main(int argc, char *argv[]) {
 
     //printf("Time: %ld us\n", (uint64_t) (GetTimeStamp() - start));
 
-    printf("Peace we out \n");
     MPI_Finalize();
-    sleep(1);
+    // sleep(300);
     return 0;
 
 }
@@ -75,6 +77,8 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     MPI_Request request;
     MPI_Datatype mpi_send_block_t = register_send_block(block_height, block_width);
     printf("Rank is %d\n", rank);
+
+    printf("a is len %d, b is len %d\n", len_a, len_b);
 
     /* ========== MASTER NODE =========== */
     if(rank==0) {
@@ -93,7 +97,6 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         int old_right;
         int old_down;
 
-        printf("I'm master \n");
 
         for(int block_num=0; block_num<n_blocks_master; block_num++) { 
             // sleep(2);
@@ -168,7 +171,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         /* Waiting for work */
 
         while(1) {
-            sleep(1);
+            // sleep(1*rank);
             MPI_Probe(MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             if(status.MPI_TAG == DIE_SLAVE) { //Goodbye, slave
                 break;
@@ -184,8 +187,8 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 start_block = block;
             }
 
+            printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
             calc_block(block);
-            // printf("Slave printing block %d with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
             print_block(block); 
             
 
@@ -195,19 +198,19 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             MPI_Isend(send_block, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &request);
 
             //Now we continue on in our direction
-            block_t* next_block = slave_next_block(block, direction, slave_sender, len_a, len_b);
+            block_t* next_block = slave_next_block(block, other_work, direction, slave_sender, len_a, len_b, mpi_send_block_t);
             int in_first = 1;
             int slave_receiver;
             while(next_block!=NULL) {
-                sleep(1);
+                // sleep(1 + rank*2);
 
                 //Maintain linked list
                 block->next = next_block;
                 block = next_block;
 
                 //Calculate block
+                printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
                 calc_block(block);
-                // printf("Slave printing block %d with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
                 print_block(block); 
 
                 if(in_first==1) { //Have to find out from master who our slave_receiver is
@@ -218,9 +221,12 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                     in_first = 0;
                 }
 
-                update_send_block(block, send_block, other_direction, slave_sender);
-                MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, 0, MPI_COMM_WORLD, &request);
-                next_block = slave_next_block(block, direction, slave_sender, len_a, len_b); 
+                // send_block = malloc_send_block(block->height, block->width);
+                update_send_block(block, send_block, other_direction, slave_sender); // Can't do this because if you get too far ahead you're overwriting the buffer
+                // MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, 0, MPI_COMM_WORLD, &request);
+                printf("Slave %d sending work to slave %d for row_off %d and col_off %d\n", rank, slave_receiver, block->off_row, block->off_col);
+                MPI_Send(send_block, 1, mpi_send_block_t, slave_receiver, INTER_SLAVE, MPI_COMM_WORLD);
+                next_block = slave_next_block(block, other_work, direction, slave_sender, len_a, len_b, mpi_send_block_t); 
             }
 
         printf("Slave %d is finished and ready for more\n", rank);
@@ -231,8 +237,11 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         sleep(1);
         free_send_block(send_block);
         free_block(start_block);
+        free_send_block(other_work);
         sleep(2);
     }
+
+    MPI_Type_free(&mpi_send_block_t);
 
 }
 
@@ -270,7 +279,7 @@ void print_block(block_t* block) {
 }
 
 void print_arr(int* arr, int size){
-
+    size += 1;
     for (int i = 0; i < size; i++){
         printf("%d ", arr[i]);
     }

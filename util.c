@@ -11,7 +11,7 @@
 
 // Registers an MPI struct for block sending
 MPI_Datatype register_send_block(int block_height, int block_width) {
-    int edge_len = max2(block_height, block_width)+1;
+    int edge_len = max2(block_height, block_width)+2;
     int count = SENDING_BLOCK_COUNT;
     int array_of_blocklengths[count];
     MPI_Aint array_of_displacements[count];
@@ -99,7 +99,7 @@ block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* ot
         }
         else {
             MPI_Status status;
-            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, MPI_ANY_TAG,
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
                                  MPI_COMM_WORLD, &status);
             copy_first_row(block, other_work->edge);
         }
@@ -117,7 +117,7 @@ block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* ot
         }
         else {
             MPI_Status status;
-            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, MPI_ANY_TAG,
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
                                  MPI_COMM_WORLD, &status);
             copy_first_column(block, other_work->edge);
         }
@@ -149,19 +149,18 @@ block_t* master_next_block(sending_block_t* left, sending_block_t* up, int len_a
     return block;
 }
 
-block_t* slave_next_block(block_t* block, int direction, int slave_sender, int len_a, int len_b) {
+block_t* slave_next_block(block_t* block, sending_block_t* other_work, int direction, int slave_sender, int len_a, int len_b, MPI_Datatype mpi_send_block_t) {
     //copy appropriate values into our block, then receive from our slave sender
     int off_row = block->off_row;
     int off_col = block->off_col;
     int height = block->height;
     int width = block->width;
+    MPI_Status status;
     //Move offsets along
-    printf("Slave about to make new block height %d width %d off_row %d off_col %d, going %d\n", height, width, off_row, off_col, direction);
     if(direction==GOING_DOWN) {
         off_col += height;
         // printf("off_col %d and len_b %d\n", off_col, len_b);
         if(off_col>=len_b) { //We are done
-            printf("In here right\n");
             return NULL;
         }
         height = min2(height, (len_b - off_col));
@@ -170,17 +169,16 @@ block_t* slave_next_block(block_t* block, int direction, int slave_sender, int l
         off_row += width;
         // printf("off_row %d and len_a %d\n", off_row, len_a);
         if(off_row>=len_a) { //We are done
-            printf("In here right\n");
             return NULL;
         }
         width = min2(width, (len_a - off_row));
     }
 
-    printf("Slave making block of size %d + %d\n", height, width);
     block_t* new_block = create_block(height, width, off_row, off_col);
 
     // Now we need to get the values we need
     if(direction==GOING_DOWN) {
+        //Copy last row from previous into first row of this one
         copy_row_block(block, new_block);
         if(slave_sender==MASTER) {
             // We're on the edge, so initialise column 
@@ -189,9 +187,11 @@ block_t* slave_next_block(block_t* block, int direction, int slave_sender, int l
             }
         }
         else {
-            // Need to receive the col from slave_sender
-            //TODO
-
+            //Copy last column from other guy into our first one
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
+                                 MPI_COMM_WORLD, &status);
+            copy_first_column(new_block, other_work->edge);
+            printf("Received work from slave sender %d\n", slave_sender);
         }
 
     }
@@ -205,7 +205,9 @@ block_t* slave_next_block(block_t* block, int direction, int slave_sender, int l
         }
         else {
             // Need to receive the row from slave_sender
-            //TODO
+            MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
+                                 MPI_COMM_WORLD, &status);
+            copy_first_row(new_block, other_work->edge);
         }
     }
     return new_block;
@@ -213,6 +215,9 @@ block_t* slave_next_block(block_t* block, int direction, int slave_sender, int l
 }
 
 void free_block(block_t* block) {
+    if(block==NULL) {
+        return;
+    }
     for(int i=0; i<block->height+1; i++) {
         free(block->matrix[i]);
     }
