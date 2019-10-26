@@ -31,8 +31,9 @@ int main(int argc, char *argv[]) {
     if (rank==0) {
         printf("Size is %d\n", size);
         //Do the file reading cuz
-        a = "ATATATAASDFSDAFSSDFASDFASDFAASDFASDFASDFASDFASDFASDFADSFSDFASDFasdfaadff"; //size 8 for now
-        b = "ATATAAASDFGSASDFASDFASDFASDFASDASDFASDFASDFASDFASDFASDFASDFAASDFASDFFASD"; //size 8 for now
+        a = get_input_str(argv[1], MAX_STRING);
+        b = get_input_str(argv[2], MAX_STRING);
+
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
     }
@@ -146,7 +147,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 block = block->next;
             }
 
-            calc_block(block);
+            calc_block(block, a, b);
             printf("Master printing block %d with row off %d and col off %d\n", block_num, block->off_row, block->off_col);
             print_block(block);
 
@@ -213,7 +214,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             }
 
             printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
-            calc_block(block);
+            calc_block(block, a, b);
             print_block(block); 
             
 
@@ -235,7 +236,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
 
                 //Calculate block
                 printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
-                calc_block(block);
+                calc_block(block, a, b);
                 print_block(block); 
 
                 if(in_first==1) { //Have to find out from master who our slave_receiver is

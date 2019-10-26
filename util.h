@@ -21,6 +21,8 @@ void copy_final_row(int* buf, block_t* block);
 void copy_first_row(block_t* block, int* buf); 
 void copy_col_block(block_t* src, block_t* dest);
 void copy_row_block(block_t* src, block_t* dest);
+char *get_input_str(char* filename, size_t size);
+
 int max2(int a, int b);
 
 int min2(int a, int b);

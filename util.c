@@ -305,7 +305,30 @@ int min2(int a, int b) {
         return a;
     }
     return b;
+}
+
 int max3(int x, int y, int z){
     return x > y ? (x > z ? x : z) : (y > z ? y : z);
 
+}
+
+char *get_input_str(char* filename, size_t size){
+//The size is extended by the input with the value of the provisional
+    FILE* fp = fopen(filename, "r");
+    char *str;
+    int ch;
+    size_t len = 0;
+    str = realloc(NULL, sizeof(char)*size);//size is start size
+    if(!str)return str;
+    while(EOF!=(ch=fgetc(fp)) && ch != '\n'){
+        str[len++]=ch;
+        //printf("%c ", ch);
+        if(len==size){
+            str = realloc(str, sizeof(char)*(size+=16));
+            if(!str)return str;
+        }
+    }
+    str[len++]='\0';
+
+    return realloc(str, sizeof(char)*len);
 }

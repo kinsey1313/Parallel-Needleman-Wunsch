@@ -5,6 +5,7 @@
 #define SLAVE_RECEIVER 4
 #define DIE_SLAVE 5
 #define INTER_SLAVE 6
+#define MAX_STRING 100000
 
 /* RANKS */
 #define MASTER 0
