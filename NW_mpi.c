@@ -13,6 +13,11 @@
 
 int main(int argc, char *argv[]) {
     int rank, size;
+
+    if(argc < 3){
+        printf("Error, enter the two string files\n");
+    }
+
     MPI_Init (&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -22,6 +27,7 @@ int main(int argc, char *argv[]) {
         printf("Error, the algorithm is only defined for >=5 nodes\n");
         exit(0);
     }
+    
 
     char* a;
     char* b;
@@ -37,30 +43,11 @@ int main(int argc, char *argv[]) {
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
     }
-
-    //DELETE
-
     
 
-    int block_height = calc_block_height(len_a, len_b, size);
-    int block_width = calc_block_width(len_a, len_b, size);
-    block_t* block = create_block(block_height, block_width, 0, 0);
-    for(int i=0; i<block->height+1; i++) {
-            block->matrix[i][0] = i*-1;
-        }
+    // DELETE
 
-    for (int i=0; i<block->width+1; i++) {
-        block->matrix[0][i] = i*-1;
-    }
-    
-    calc_block(block, a,b);
-    print_block(block);
-    exit(0);
 
-    ////DELETE
-
-    
-    
 
     MPI_Bcast(&len_a, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&len_b, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -72,9 +59,6 @@ int main(int argc, char *argv[]) {
 
     MPI_Bcast(a, len_a+1, MPI_CHAR, 0, MPI_COMM_WORLD);
     MPI_Bcast(b, len_b+1, MPI_CHAR, 0, MPI_COMM_WORLD);
-
-    len_a = 5000;
-    len_b = 5000;
 
     
 
