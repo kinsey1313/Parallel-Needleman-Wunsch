@@ -66,4 +66,9 @@ int rear(struct Queue* queue)
     if (isEmpty(queue)) 
         return INT_MIN; 
     return queue->array[queue->rear]; 
-} 
+}
+
+void free_queue(struct Queue* queue) {
+    free(queue->array);
+    free(queue);
+}
