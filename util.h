@@ -22,4 +22,8 @@ void copy_first_row(block_t* block, int* buf);
 void copy_col_block(block_t* src, block_t* dest);
 void copy_row_block(block_t* src, block_t* dest);
 int max2(int a, int b);
+
 int min2(int a, int b);
+
+int max3(int a, int b, int c);
+

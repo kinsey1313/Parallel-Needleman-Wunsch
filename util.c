@@ -305,4 +305,7 @@ int min2(int a, int b) {
         return a;
     }
     return b;
+int max3(int x, int y, int z){
+    return x > y ? (x > z ? x : z) : (y > z ? y : z);
+
 }
