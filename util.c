@@ -55,7 +55,7 @@ block_t* create_block(int height, int width, int off_row, int off_col) {
 }
 
 sending_block_t* create_send_block(block_t* block, int direction, int slave_sender) {
-    int edge_len = max2(block->height, block->width) + 1;
+    int edge_len = max2(block->height, block->width) + 2;
     sending_block_t *send_block = malloc(sizeof(*send_block) + sizeof(int) * edge_len);
     update_send_block(block, send_block, direction, slave_sender);
     return send_block;
@@ -129,7 +129,7 @@ block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* ot
 
 //Used by receivers to create a buffer for the incoming block
 sending_block_t* malloc_send_block(int height, int width) {
-    int edge_len = max2(height, width) + 1;
+    int edge_len = max2(height, width) + 2;
     sending_block_t* send_block = malloc(sizeof(*send_block) + sizeof(int) * edge_len);
     return send_block;
 }
