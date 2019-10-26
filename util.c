@@ -47,9 +47,9 @@ block_t* create_block(int height, int width, int off_row, int off_col) {
     block->off_row = off_row;
     block->off_col = off_col;
     block->next = NULL;
-    block->matrix = malloc(sizeof(int*) * height+1);
+    block->matrix = malloc(sizeof(int*) * (height+1));
     for(int i=0; i<height+1; i++) {
-        block->matrix[i] = calloc(width+1, sizeof(int));
+        block->matrix[i] = malloc((width+1) * sizeof(int));
     }
     return block;
 }

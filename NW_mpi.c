@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
     if (rank==0) {
         printf("Size is %d\n", size);
         //Do the file reading cuz
-        a = "ATATCAKSJDFKLJAS;DFDJOIENEFAKSNDFKASNDIFOANRILAKSNDFKNAGOIANRGILANFNSRFOIENRFDKFNSDKJFGEOIRNGSDKFNGDSG"; //size 8 for now
-        b = "ATATAASDFINGSDFKNGSDFGJISEORNGSDLKFNGSERIONGSDKFLGSDIRGJISEORJGSDKRGJS;IDFJGSKDLFJG;SIDRJGSLDKFJGSIDRJ"; //size 8 for now
+        a = "ATATATAASDFSDAFSDFGSDFGSDFGT"; //size 8 for now
+        b = "ATATAAASDFASSDFGSDFGSDGSDFSD"; //size 8 for now
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
     }
@@ -41,8 +41,13 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(&len_a, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&len_b, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    MPI_Bcast(&a, len_a, MPI_CHAR, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&b, len_b, MPI_CHAR, 0, MPI_COMM_WORLD);
+    if(rank!=MASTER) {
+        a = malloc((len_a+1) * sizeof(char));
+        b = malloc((len_b+1) * sizeof(char));
+    }
+
+    MPI_Bcast(a, len_a+1, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast(b, len_b+1, MPI_CHAR, 0, MPI_COMM_WORLD);
 
     
 
@@ -69,6 +74,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     MPI_Status status;
     MPI_Request request;
     MPI_Datatype mpi_send_block_t = register_send_block(block_height, block_width);
+    printf("Rank is %d\n", rank);
 
     /* ========== MASTER NODE =========== */
     if(rank==0) {
@@ -86,6 +92,8 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         int worker_down=0;
         int old_right;
         int old_down;
+
+        printf("I'm master \n");
 
         for(int block_num=0; block_num<n_blocks_master; block_num++) { 
             // sleep(2);
