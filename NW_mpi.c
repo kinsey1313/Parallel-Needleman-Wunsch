@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
 
 void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     
+    printf("len a is %d and len_b is %d\n", len_a, len_b);
     int n_blocks_master = calc_n_blocks(len_a, len_b, size);
     int block_height = calc_block_height(len_a, len_b, size);
     int block_width = calc_block_width(len_a, len_b, size);
@@ -151,6 +152,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             }
 
             calc_block(block, a, b);
+            printf("Master done block %d\n", block_num);
             print_block(block);
 
             if(block_num==n_blocks_master-1) { //If the last block, we don't need to send it to anyone
@@ -368,8 +370,8 @@ int calc_block_height(int len_a, int len_b, int size) {
 
 // There are n * n blocks, this is actually sqrt(total blocks)
 int calc_n_blocks(int len_a, int len_b, int size) {
-    if(len_a%4 || len_b%4) {
-        return TILING_NUMBER+1;
+    if(len_a%TILING_NUMBER || len_b%TILING_NUMBER) {
+        return TILING_NUMBER;
     }
     return TILING_NUMBER;
 }
