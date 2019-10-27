@@ -6,6 +6,7 @@ Jack Stinson and Kinsey Reeves
 
 
 **Compilation and Execution** 
+
 For overall combined NW using openMP and MPI (Main implementation):
 
 `mpicc NW_mpi.c queue.c util.c -fopenmp -std=c99 -o NW_mpi`
