@@ -5,6 +5,8 @@
 #include <sys/time.h>
 #include <stdint.h>
 
+//Needleman Wunch computed along the diagonal, using openmP
+//As part of parallel and multicore computing
 
 #define MAX_STRING 100000
 
@@ -25,7 +27,6 @@ uint64_t GetTimeStamp() {
 }
 
 int main(int argc, char* argv[]){
-    //int arr[3][4] = {{1,2,3,4}, {4,5,6,4}, {7,8,9,4}};
     int dim = 4;
     
     char* str_a = get_input_str(argv[1], MAX_STRING);
@@ -66,6 +67,8 @@ int main(int argc, char* argv[]){
     printf ("Time Serial: %ld us\n", (uint64_t) (GetTimeStamp() - start));
     //print_arr(scores, len_a,len_b);
 
+    back_track(scores,str_a,str_b,len_a,len_b);
+
     return 0;
 }
 
@@ -105,6 +108,7 @@ void wunch_omp(int** scores, char* str_a, char* str_b, int len_a, int len_b){
 }
 
 void wunch_score(int** scores, char* str_a, char* str_b, int i, int j){
+    //Wunch scoring method
     int match = 1;
     int mismatch = -1;
     int gap = -1;
@@ -123,30 +127,26 @@ void wunch_score(int** scores, char* str_a, char* str_b, int i, int j){
 }
 
 void back_track(int** scores, char* str_a, char* str_b, int len_a, int len_b){
-    
-    print_arr(scores,len_a,len_b);
+    //Backtracks to print the optimal string
+    //print_arr(scores,len_a,len_b);
     
     int i = len_a-1;
     int j = len_b-1;
-    printf("%s %s ", str_a, str_b);
-    printf("%d %d\n", i, j);
-    printf("scores[4][2] : %d\n", scores[4][2]);
-    
-    //printf("%c, %c %c", str_a[i], str_a[i-1], str_a[i-2]); 
+
     check_path(scores,i,j,str_a,str_b);
 
 }
 
 
 void check_path(int** scores, int i, int j, char* str_a, char* str_b){
-    
+    //Recursively follows all paths back to root node (top left of array)
     int val = scores[i][j];
-    printf("val: %d , idx: ", val);
-    printf("%d %d\n",i, j);
+    //printf("val: %d , idx: ", val);
+    //printf("%d %d\n",i, j);
     
     fflush(stdout);
     if(i==0 && j == 0){
-        printf("Done \n", scores[i][j]);
+        printf("%c %c\n", str_a[i]);
     }else{
         if(i > 0 && j > 0){
             //printf("%c %c\n", str_b[i], str_a[j]);

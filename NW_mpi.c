@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
 
     if(argc < 3){
         printf("Error, enter the two string files\n");
+        exit(0);
     }
 
     MPI_Init (&argc, &argv);
@@ -40,7 +41,6 @@ int main(int argc, char *argv[]) {
         printf("Error, the algorithm is only defined for >=5 nodes\n");
         exit(0);
     }
-    
 
     char* a;
     char* b;
@@ -73,13 +73,11 @@ int main(int argc, char *argv[]) {
 
     MPI_Bcast(a, len_a+1, MPI_CHAR, 0, MPI_COMM_WORLD);
     MPI_Bcast(b, len_b+1, MPI_CHAR, 0, MPI_COMM_WORLD);
-
     
     uint64_t start = GetTimeStamp();
    
     //printf("%d", A);
     nwmpi(a, b, len_a, len_b, rank, size);
-
     
     MPI_Finalize();
     if(rank==MASTER){
