@@ -30,5 +30,6 @@ and
 
 The Blocking which is spoken about in the report can be changed by changing 
 TILING_NUMBER in NW_mpi.h
+
 A high level description of the code can be found in description.txt
 
