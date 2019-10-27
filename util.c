@@ -150,6 +150,7 @@ block_t* master_next_block(sending_block_t* left, sending_block_t* up, int len_a
     return block;
 }
 
+//For slaves that are continuing on their own path
 block_t* slave_next_block(block_t* block, sending_block_t* other_work, int direction, int slave_sender, int len_a, int len_b, MPI_Datatype mpi_send_block_t) {
     //copy appropriate values into our block, then receive from our slave sender
     int off_row = block->off_row;

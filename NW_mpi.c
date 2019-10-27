@@ -1,4 +1,7 @@
 /* Needleman MPI */
+/* Jack Stinson  and Kinsey Reeves for Parallel and Multicore */
+
+/* Compile with mpicc -O3 NW_mpi.c util.c queue.c -o needleman */
 
 #include <stdio.h>
 #include <string.h>
@@ -9,7 +12,7 @@
 #include "types.h"
 #include "util.h"
 #include "NW_mpi.h"
-//#include <time.h>
+#include <time.h>
 #include <stdint.h>
 #include <sys/time.h>
 
@@ -46,25 +49,19 @@ int main(int argc, char *argv[]) {
     int len_b;
     if (rank==0) {
         printf("Size is %d\n", size);
-        //Do the file reading cuz
         a = get_input_str(argv[1], MAX_STRING);
         b = get_input_str(argv[2], MAX_STRING);
 
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
+
+        //These lines are here to ensure both sequences are the same length,
+        //And that they fit neatly into the blocks created. 
         len_a = len_a - len_a % TILING_NUMBER;
         len_b = len_b - len_b % TILING_NUMBER;
         len_a = min2(len_a, len_b);
         len_b = len_a;
-        // len_a = min2(len_a, len_b) - 50;
-        // printf("Len_a = len_b = %d\n", len_a);
-        // len_b = len_a;
     }
-
-     //TODO Remove this temporary fix, ensures that they are same length
-   
-
-
 
     MPI_Bcast(&len_a, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&len_b, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -93,29 +90,25 @@ int main(int argc, char *argv[]) {
 
 }
 
+/* Needleman Wunsch algorithm, running over MPI */
 void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     
-    printf("len a is %d and len_b is %d\n", len_a, len_b);
-    int n_blocks_master = calc_n_blocks(len_a, len_b, size);
+    int n_blocks_master = calc_n_blocks(len_a, len_b, size); //Blocks that master will do along the diagonal
     int block_height = calc_block_height(len_a, len_b, size);
     int block_width = calc_block_width(len_a, len_b, size);
-    printf("We begin with %d by %d blocks of height %d and width %d\n", n_blocks_master, n_blocks_master, block_height, block_width);
 
     MPI_Status status;
     MPI_Request request;
+    //Register MPI Datatype for sending partial blocks 
     MPI_Datatype mpi_send_block_t = register_send_block(block_height, block_width);
-    //printf("Rank is %d\n", rank);
 
-    //printf("a is len %d, b is len %d\n", len_a, len_b);
 
     /* ========== MASTER NODE =========== */
-    if(rank==0) {
+    if(rank==MASTER) {
         // First block for master
         block_t* block = create_block(block_height, block_width, 0, 0);
         block_t* start_block = block; //Keep a pointer to the first one
         // Create and initialise queue of workers
-
-
         struct Queue* worker_queue = createQueue(size-1);
         init_queue(worker_queue, size-1);
         
@@ -129,7 +122,6 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
 
 
         for(int block_num=0; block_num<n_blocks_master; block_num++) { 
-            // sleep(2);
             
             if(block_num==0) { //Initialise the sides
                 for(int i=0; i<block->height+1; i++) {
@@ -145,23 +137,18 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 // printf("Master is waiting to receive work from workers %d and %d\n", worker_right, worker_down);
                 MPI_Recv(job_right, 1, mpi_send_block_t, worker_right, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
                 MPI_Recv(job_down, 1, mpi_send_block_t, worker_down, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-                // printf("Master Received the work\n");
                 
                 block->next = master_next_block(job_right, job_down, len_a, len_b);
                 block = block->next;
             }
 
             calc_block(block, a, b);
-            printf("Master done block %d\n", block_num);
-            print_block(block);
 
             if(block_num==n_blocks_master-1) { //If the last block, we don't need to send it to anyone
-                //printf("Master is all done\n");
                 break;
             }
 
-            // // Now we take the processes out and send them the job
-
+            // // Now we take the processes out and send them the jobs
             old_right = worker_right;
             worker_right = get_next_worker(worker_queue);
             update_send_block(block, job_right, GOING_RIGHT, old_right);
@@ -179,7 +166,6 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 // printf("Sending slave receiver %d to worker %d \n ", worker_down, old_down);
                 MPI_Isend(&worker_down, 1, MPI_INT, old_down, SLAVE_RECEIVER, MPI_COMM_WORLD, &request);
             }
-            // sleep(2);
         }
 
         // Tell all slaves to die
@@ -191,6 +177,8 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         free_block(block);
         free_queue(worker_queue); 
     }
+
+
     /*========SLAVE NODE============*/
     else {
         /* Initialise */
@@ -201,7 +189,6 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         /* Waiting for work */
 
         while(1) {
-            // sleep(1*rank);
             MPI_Probe(MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             if(status.MPI_TAG == DIE_SLAVE) { //Goodbye, slave
                 break;
@@ -217,10 +204,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 start_block = block;
             }
 
-            // printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
             calc_block(block, a, b);
-            // print_block(block); 
-            
 
             // Send first phase results back to master
             int other_direction = get_other_direction(direction);
@@ -232,7 +216,6 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             int in_first = 1;
             int slave_receiver;
             while(next_block!=NULL) {
-                // sleep(1 + rank*2);
 
                 //Maintain linked list
                 block->next = next_block;
@@ -240,21 +223,15 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
 
                 //Calculate block
                 calc_block(block, a, b);
-                // print_block(block); 
 
-                if(in_first==1) { //Have to find out from master who our slave_receiver is
-                    //TODO this is written under the assumption that blocks that don't need
-                    // A slave receiver will not his this block. If you get a bug later,
-                    // That's probably why
+                if(in_first==1) { //Have to find out from master who our slave_receiver is, so this must be a blocking receive
                     MPI_Recv(&slave_receiver, 1, MPI_INT, MASTER, SLAVE_RECEIVER, MPI_COMM_WORLD, &status);
                     in_first = 0;
                 }
 
-                // send_block = malloc_send_block(block->height, block->width);
-                update_send_block(block, send_block, other_direction, slave_sender); // Can't do this because if you get too far ahead you're overwriting the buffer
-                // MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, 0, MPI_COMM_WORLD, &request);
+                update_send_block(block, send_block, other_direction, slave_sender); 
                 //printf("Slave %d sending work to slave %d for row_off %d and col_off %d\n", rank, slave_receiver, block->off_row, block->off_col);
-                MPI_Isend(send_block, 1, mpi_send_block_t, slave_receiver, INTER_SLAVE, MPI_COMM_WORLD, &request);
+                MPI_Send(send_block, 1, mpi_send_block_t, slave_receiver, INTER_SLAVE, MPI_COMM_WORLD);
                 next_block = slave_next_block(block, other_work, direction, slave_sender, len_a, len_b, mpi_send_block_t); 
             }
 
@@ -262,22 +239,17 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
         MPI_Send(&rank, 1, MPI_INT, MASTER, FINISHED_WORK, MPI_COMM_WORLD);
         }
 
-        //printf("Slave %d killed\n", rank);
-        //sleep(1);
         free_send_block(send_block);
         free_block(start_block);
         free_send_block(other_work);
-        //sleep(2);
     }
 
     MPI_Type_free(&mpi_send_block_t);
 
 }
 
+// Calculates a block
 void calc_block(block_t* block, char* str_a, char* str_b) {
-    //TODO
-    //TODO Make sure it uses the top row or left col if needed. These are not part 
-    // Of the block for good reason
     wunch_omp(block->matrix, &str_a[block->off_row], 
         &str_b[block->off_col], block->width, block->height);
 
@@ -343,13 +315,13 @@ int get_next_worker(struct Queue* worker_queue) {
 
 
 void print_block(block_t* block) {
-    // printf("\n");
-    // for(int i = 0; i < block->height+1; i++){
-    //     for (int j = 0; j < block->width+1; j++){
-    //         printf("%d\t", block->matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
+    printf("\n");
+    for(int i = 0; i < block->height+1; i++){
+        for (int j = 0; j < block->width+1; j++){
+            printf("%d\t", block->matrix[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 void print_arr(int* arr, int size){
