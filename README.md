@@ -24,6 +24,6 @@ For NW-omp / Sequential only (for testing purposes)
 
 and
 
-./NW_omp data/m_single_100000.txt data/g_100000.txt
+`./NW_omp data/m_single_100000.txt data/g_100000.txt`
 
 
