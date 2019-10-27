@@ -77,7 +77,7 @@ void update_send_block(block_t* block, sending_block_t* send_block, int directio
 }
 
 //Create a block to work on based on the send_block that was received
-block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* other_work, MPI_Datatype mpi_send_block_t) {
+block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* other_work, MPI_Datatype mpi_send_block_t, int len_a, int len_b) {
     int height = send_block->height;
     int width = send_block->width;
     int off_row = send_block->off_row;
@@ -88,11 +88,12 @@ block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* ot
     if(direction==GOING_RIGHT) {
         //Increment offset
         block->off_row += width;
+        block->width = min2(width, (len_a - off_row));
         //Copy into first column, including corner value
         copy_first_column(block, send_block->edge);
         if(slave_sender==MASTER) { //Case where we're on the edge
             // initialise first row values accordingly
-            for(int i=0; i<width+1; i++) {
+            for(int i=0; i<block->width+1; i++) {
                 block->matrix[0][i] = -1 * block->off_row - i;
             }
         }
@@ -106,11 +107,12 @@ block_t* create_block_from_send(sending_block_t* send_block, sending_block_t* ot
     if(direction==GOING_DOWN) {
         //Increment offset
         block->off_col += height;
+        block->height = min2(height, (len_b - off_col));
         //Copy into first row, including corner value
         copy_first_row(block, send_block->edge);
         if(slave_sender==MASTER) { //Case where we're on the edge
             // initialise first col values accordingly
-            for(int i=0; i<height+1; i++) {
+            for(int i=0; i<block->height+1; i++) {
                 block->matrix[i][0] = -1 * block->off_col - i;
             }
         }
@@ -190,7 +192,6 @@ block_t* slave_next_block(block_t* block, sending_block_t* other_work, int direc
             MPI_Recv(other_work, 1, mpi_send_block_t, slave_sender, INTER_SLAVE,
                                  MPI_COMM_WORLD, &status);
             copy_first_column(new_block, other_work->edge);
-            printf("Received work from slave sender %d\n", slave_sender);
         }
 
     }

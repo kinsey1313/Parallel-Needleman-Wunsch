@@ -52,10 +52,17 @@ int main(int argc, char *argv[]) {
 
         len_a = (int) strlen(a);
         len_b = (int) strlen(b);
+        len_a = len_a - len_a % TILING_NUMBER;
+        len_b = len_b - len_b % TILING_NUMBER;
+        len_a = min2(len_a, len_b);
+        len_b = len_a;
+        // len_a = min2(len_a, len_b) - 50;
+        // printf("Len_a = len_b = %d\n", len_a);
+        // len_b = len_a;
     }
-    
 
-    // DELETE
+     //TODO Remove this temporary fix, ensures that they are same length
+   
 
 
 
@@ -72,7 +79,7 @@ int main(int argc, char *argv[]) {
 
     
     uint64_t start = GetTimeStamp();
-    
+   
     //printf("%d", A);
     nwmpi(a, b, len_a, len_b, rank, size);
 
@@ -91,7 +98,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
     int n_blocks_master = calc_n_blocks(len_a, len_b, size);
     int block_height = calc_block_height(len_a, len_b, size);
     int block_width = calc_block_width(len_a, len_b, size);
-    //printf("We begin with %d by %d blocks of height %d and width %d\n", n_blocks_master, n_blocks_master, block_height, block_width);
+    printf("We begin with %d by %d blocks of height %d and width %d\n", n_blocks_master, n_blocks_master, block_height, block_width);
 
     MPI_Status status;
     MPI_Request request;
@@ -144,8 +151,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             }
 
             calc_block(block, a, b);
-            //printf("Master printing block %d with row off %d and col off %d\n", block_num, block->off_row, block->off_col);
-            //print_block(block);
+            print_block(block);
 
             if(block_num==n_blocks_master-1) { //If the last block, we don't need to send it to anyone
                 //printf("Master is all done\n");
@@ -201,7 +207,7 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
             MPI_Recv(send_block, 1, mpi_send_block_t, MASTER, 0, MPI_COMM_WORLD, &status);
             int direction = send_block->direction; //The way the slave will continue on
             int slave_sender = send_block->slave_sender; //Where to receive the other values from
-            block_t* block = create_block_from_send(send_block, other_work, mpi_send_block_t);
+            block_t* block = create_block_from_send(send_block, other_work, mpi_send_block_t, len_a, len_b);
             //printf("Slave %d is beginning work on block with row_off %d and col_off %d\n", rank, block->off_row, block->off_col);
 
             // Maintain the linked list
@@ -209,9 +215,9 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 start_block = block;
             }
 
-            //printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
+            // printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
             calc_block(block, a, b);
-            print_block(block); 
+            // print_block(block); 
             
 
             // Send first phase results back to master
@@ -231,9 +237,8 @@ void nwmpi(char* a, char* b, int len_a, int len_b, int rank, int size) {
                 block = next_block;
 
                 //Calculate block
-                //printf("Slave %d printing block with offsets row %d and col %d:\n", rank, block->off_row, block->off_col);
                 calc_block(block, a, b);
-                print_block(block); 
+                // print_block(block); 
 
                 if(in_first==1) { //Have to find out from master who our slave_receiver is
                     //TODO this is written under the assumption that blocks that don't need
@@ -271,10 +276,8 @@ void calc_block(block_t* block, char* str_a, char* str_b) {
     //TODO
     //TODO Make sure it uses the top row or left col if needed. These are not part 
     // Of the block for good reason
-    wunch_omp(block->matrix, &str_a[block->off_col], 
-        &str_b[block->off_row], block->height, block->width);
-
-    print_block(block);
+    wunch_omp(block->matrix, &str_a[block->off_row], 
+        &str_b[block->off_col], block->width, block->height);
 
 }
 
@@ -288,7 +291,6 @@ void wunch_omp(int** scores, char* str_a, char* str_b, int len_a, int len_b){
         #pragma omp parallel for
         for (int j = 0; j <=k; j++){
             int i = k - j;
-            //printf("%d %d |", i+1, j+1);
             wunch_score(scores, str_a, str_b, i+1, j+1);
         }
         //printf("\n");
@@ -357,17 +359,17 @@ void print_arr(int* arr, int size){
 }
 
 int calc_block_width(int len_a, int len_b, int size) {
-    return len_a / 4;
+    return len_a / TILING_NUMBER;
 }
 
 int calc_block_height(int len_a, int len_b, int size) {
-    return len_b / 4;
+    return len_b / TILING_NUMBER;
 }
 
 // There are n * n blocks, this is actually sqrt(total blocks)
 int calc_n_blocks(int len_a, int len_b, int size) {
     if(len_a%4 || len_b%4) {
-        return 5;
+        return TILING_NUMBER+1;
     }
-    return 4;
+    return TILING_NUMBER;
 }

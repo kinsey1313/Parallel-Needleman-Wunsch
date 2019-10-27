@@ -7,6 +7,8 @@
 #define INTER_SLAVE 6
 #define MAX_STRING 100000
 
+#define TILING_NUMBER 10
+
 /* RANKS */
 #define MASTER 0
 
