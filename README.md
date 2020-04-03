@@ -1,4 +1,6 @@
-# PMC-Assignment2
+# Parallel Needleman Wunsch Algorithm
+
+Implementation significantly speeds up normal grid computation, uses MPI and openMP in C.
 
 Parallel and Multicore Assignment 2
 Jack Stinson and Kinsey Reeves
